@@ -1,0 +1,50 @@
+#!/system/bin/sh
+echo 'start deboot...'
+
+echo 'backup env vars...'
+PATH_BAK=$PATH
+TERM_BAK=$TERM
+HOME_BAK=$HOME
+
+echo 'mount chroot partitions...'
+CHROOT_PATH='/data/debian'
+PARTITION='/dev/block/mmcblk2p2'
+
+if [ ! -d $CHROOT_PATH ]; then
+	mkdir $CHROOT_PATH || exit 1
+fi
+
+echo "  $CHROOT_PATH..."
+mount -t ext3 $PARTITION $CHROOT_PATH || exit 1
+
+for bind_dir in dev dev/pts proc sys; do
+	echo "  $bind_dir..."
+	mount -o bind $bind_dir $CHROOT_PATH/$bind_dir
+done
+
+echo 'set chroot env vars...'
+export PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+export TERM='linux'
+export HOME='/root'
+export LANG='ja_JP.UTF-8'
+
+echo 'start chroot...'
+/system/xbin/chroot $CHROOT_PATH /bin/bash -l
+echo 'end chroot...'
+
+echo 'restore env vars...'
+export PATH=$PATH_BAK
+export TERM=$TERM_BAK
+export HOME=$HOME_BAK
+unset LANG
+
+echo 'unmount chroot partitions...'
+for unbind_dir in sys proc dev/pts dev; do
+	echo "  $unbind_dir..."
+	umount $CHROOT_PATH/$unbind_dir
+done
+echo "  $CHROOT_PATH..."
+umount $CHROOT_PATH
+
+echo 'end deboot...'
+exit 0
